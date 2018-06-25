@@ -7,6 +7,7 @@ const connect_socket_to_server = connection => {
 
   socket.on("UPDATE_USERS", players => {
     connection.players = players;
+    console.log(players);
   });
 
   const client = {
