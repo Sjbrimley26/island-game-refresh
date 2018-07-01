@@ -8,9 +8,9 @@ const addSocketFunctions = io => {
   }
 
   const update_user_broadcast = broadcast.bind(this, "UPDATE_USERS", io.players);
+  const disconnect_broadcast = broadcast.bind(this, "disconnect", io.players);
 
   io.on("connection", socket => {
-    // console.log("Connected!");
 
     socket.on("ADD_USER", user => {
       // console.log(`User #${user.id} connected!`);
@@ -20,12 +20,15 @@ const addSocketFunctions = io => {
     });
 
     socket.on("disconnect", () => {
-      // console.log(`User #${socket.user.id} disconnected!`);
       if (socket.user) {
-        io.players = R.dissoc(socket.user.id, io.players);
+        // console.log(`User #${socket.user.id} disconnected!`);
+        delete io.players[socket.user.id];
         update_user_broadcast();
+        disconnect_broadcast();
       }
     });
+
+    
 
   });
 
