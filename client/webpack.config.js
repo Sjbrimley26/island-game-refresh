@@ -1,5 +1,8 @@
 const path = require("path");
-const { htmlPlugin } = require("./webpackPlugins");
+const { 
+  htmlPlugin,
+  uglifyPlugin
+} = require("./webpackPlugins");
 
 
 module.exports = {
@@ -18,11 +21,16 @@ module.exports = {
       {
         test: /\.js$/,
         exclude: /node_modules/,
-        loader: "babel-loader"
+        loader: "babel-loader?cacheDirectory"
+      },
+      {
+        test: /\.(jpe?g|png|gif|svg)$/i,
+        use: ["url-loader?limit=10000", "img-loader"]
       }
     ]
   },
   plugins: [
-    htmlPlugin
+    htmlPlugin,
+    uglifyPlugin
   ]
 }
