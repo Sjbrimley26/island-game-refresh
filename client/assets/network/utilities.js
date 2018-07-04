@@ -58,11 +58,23 @@ const get_random_of_array = array => {
   return array[get_random_number(0, array.length)];
 };
 
+const add_listen = obj => {
+  return {
+    ...obj,
+    listen: (event, emitter) => {
+      return cb => {
+        emitter.on( event, cb );
+      };
+    }
+  }
+};
+
 module.exports = {
   get_new_id,
   get_random_letter,
   get_random_number,
   get_random_of_multiple,
   is_even,
-  get_random_of_array
+  get_random_of_array,
+  add_listen
 };

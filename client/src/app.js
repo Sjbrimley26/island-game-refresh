@@ -5,18 +5,24 @@ const {
   connect_socket_to_server
 } = require("../assets/network/socket");
 
+const { Repeater } = require("../assets/gameplay/emitter");
+
 const { Game, AUTO, Scene } = require("phaser");
+
 const { 
   get_new_id, 
   get_random_number, 
   get_random_of_multiple,
   is_even,
+  add_listen,
   get_random_of_array
  } = require("../assets/network/utilities");
 
 const {
   get_XY_at_tile,
-  get_random_tile_XY
+  get_random_tile_XY,
+  get_tile_position_from_XY,
+  get_tile_distance
 } = require("../assets/gameplay/tileFunctions");
 
 const client = connect_socket_to_server();
@@ -26,8 +32,8 @@ const createSampleUser = () => {
   while (
     x == 0 ||
     y == 0 ||
-    x > 800 ||
-    y > 600
+    x > 1080 ||
+    y > 810
   ) {
     [x, y] = get_random_tile_XY();
   }
@@ -44,12 +50,14 @@ const sampleUser = createSampleUser();
 
 const my_player = R.find(sprite => sprite.name === sampleUser.id);
 
+const repeater = new Repeater;
+
 const scene = new Scene('Game');
 
 const phaserConfig = {
   type: AUTO,
-  width: 800,
-  height: 600,
+  width: 1080,
+  height: 810,
   scene
 };
 
@@ -81,12 +89,6 @@ scene.create = function () {
   game.marker.visible = false;
   game.hex_tiles.add(game.marker);
   move_index = game.input.addMoveCallback(checkHex);
-  
-  all_tile_positions.forEach(tile => {
-    const [ x, y ] = tile;
-    let newMarker = this.add.sprite(x, y, 'marker');
-    newMarker.setOrigin = (0.5, 0.5);
-  })
 
   client.socket.on("UPDATE_USERS", payload => {
     console.log(payload);
@@ -112,8 +114,8 @@ scene.create = function () {
 const spawn_tiles = () => {
   const hexagon_width = 128;
   const hexagon_height = 112;
-  const grid_x = 10;
-  const grid_y = 12;
+  const grid_x = 12;
+  const grid_y = 16;
   let hexagon_group;
 
   hexagon_group = scene.add.group();
@@ -152,81 +154,50 @@ const spawn_tiles = () => {
     hexagon_width/2
   ) / 2;
 
-  if ( is_even(grid_x)) {
+  if ( is_even(grid_x) ) {
     hexagon_group.x -= hexagon_width/8;
   }
 
   return hexagon_group;
 };
 
-const checkHex = () => {
-  const { hex_tiles } = game;
-  const hexagon_width = 128;
-  const hexagon_height = 112;
-  const sector_width = hexagon_width / 4 * 3;
-  const sector_height = hexagon_height;
-  const gradient = ( (hexagon_width/4) / (hexagon_height/2) );
-  let candidate_x = Math.floor( (game.input.activePointer.worldX - hex_tiles.x) / sector_width );
-  let candidate_y = Math.floor( (game.input.activePointer.worldY - hex_tiles.y) / sector_height);
-  const dX = (game.input.activePointer.worldX - hex_tiles.x) % sector_width;
-  const dY = (game.input.activePointer.worldY - hex_tiles.y) % sector_height;
-  
-  if ( is_even(candidate_x) ) {
-    if ( dX < ((hexagon_width / 4) - dY * gradient) ) {
-      candidate_x--;
-      candidate_y--;
-    }
-    if ( dX < ((hexagon_width / 4) + dY * gradient) ) {
-      candidate_x--;
-    }
-  }
-  else {
-    if ( dY >= hexagon_height/2 ) {
-      if ( dX < (hexagon_height/2 - dY * gradient) ) {
-        candidate_x--;
-      }
-    }
-    else {
-      if ( dX < dY * gradient ) {
-        candidate_x--;
-      }
-      else {
-        candidate_y--;
-      }
-    }
-  }
+const checkHex = event => {
+  const { clientX, clientY } = event;
 
-  place_marker(candidate_x, candidate_y);
-
+  try {
+    const [x, y] = get_tile_position_from_XY(clientX, clientY);
+    place_marker(x, y);
+    repeater.broadcast_mouse_movement(x, y);
+  }
+  catch (e) {
+    /* 
+      I hate doing this but I don't know how else to make
+      the errors stop.
+      It's just because the get_tile_position_from_XY returns undefined in certain
+      spots.
+    */
+  }
 };
 
 const place_marker = ( x, y ) => {
   let { marker } = game;
-  const grid_y = 12;
-  const hexagon_width = 128;
-  const hexagon_height = 112;
-  const columns = [ Math.floor(grid_y/2), Math.ceil(grid_y/2) ];
 
-  if ( 
+  if (
     x < 0 ||
     y < 0 ||
-    x >= 10 ||
-    y > columns[x%2] - 1
-  ) 
-  {
+    x >= 1080 ||
+    y > 810
+  ) {
     marker.visible = false;
-  }
-  else {
+  } else {
     marker.visible = true;
-    marker.x = hexagon_width/4*3 * x;
-    marker.y = hexagon_height * y - hexagon_height/2;
-
-    if ( is_even(x) ) {
-      marker.y += hexagon_height/2;
-    }
-    else {
-      marker.y += hexagon_height;
-    }
+    marker.x = x;
+    marker.y = y;
   }
+}
 
-};
+const pickle = add_listen({});
+
+pickle.listen( "mouse_moved", repeater )( payload => {
+  // console.log("Heard!", payload);
+});
