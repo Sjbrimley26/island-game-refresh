@@ -1,8 +1,10 @@
 const { get_random_of_array, is_even } = require("../network/utilities");
-const { range, compose, zip, flatten } = require("rambda");
+const { range, compose, zip, flatten, curry, subtract, add } = require("rambda");
 
 const hexagon_width = 128;
 const hexagon_height = 112;
+const rows = 12;
+const columns = 16;
 
 const get_XY_at_tile = (tileX, tileY) => {
   let x = hexagon_width / 4 * 3 * tileX;
@@ -94,17 +96,70 @@ const get_tile_distance = (x1, y1) => (x2, y2) => {
   const clean = compose(
     Math.ceil,
     Math.abs,
-    (a, b) => a - b
+    subtract
   );
   let xDiff = clean(x2, x1);
   let yDiff = clean(y2, y1);
   return xDiff >= yDiff ? xDiff : yDiff; 
 };
 
+// Only works when tiles are one tile away for now
+
+const get_tiles_near_tile = ( tileX, tileY, maxDistance ) => {
+  let tiles = [];
+  let factors = range(1, maxDistance + 1);
+  
+  const push_if_new = ( array, xy_pair ) => {
+    if ( 
+      array.some(coord => {
+        xy_pair[0] == coord[0] &&
+        xy_pair[1] == coord[1]
+      }) 
+    ) {
+      return;
+    }
+    array.push(xy_pair);
+  };
+
+  const add_tile = curry(push_if_new)(tiles);
+
+  factors.forEach(factor => {
+    add_tile([tileX + factor, tileY]);
+    add_tile([tileX - factor, tileY]);
+    add_tile([tileX, tileY + factor]);
+    add_tile([tileX, tileY - factor]);
+
+    if ( is_even(tileX) ) {
+      add_tile([tileX - factor, tileY - factor]);
+      add_tile([tileX + factor, tileY - factor]);
+    } else {
+      add_tile([tileX - factor, tileY + factor]);
+      add_tile([tileX + factor, tileY + factor]);
+    }
+  });
+
+
+  return tiles.filter(tile => {
+    return tile[0] >= 0 &&
+      tile[0] <= rows &&
+      tile[1] >= 0 &&
+      tile[1] <= columns;
+  });
+};
+
+const get_tile_index_from_tileXY = ( tileX, tileY ) => {
+  const [ x, y ] = get_XY_at_tile(tileX,tileY);
+  for ( let i = 0; i < all_tile_positions.length; i++ ) {
+    if ( all_tile_positions[i][0] === x && all_tile_positions[i][1] === y ) {
+      return i;
+    }
+  }
+  return -1;
+};
+
 /*
   TODO
-    Add a "grid" system so you can find adjacent tiles. WAIT duh get_XY_at_tile
-    Figure out how to do tile distances away (for item / movement ranges)
+    Show all tiles within a distance of a given tile.
 */
 
 module.exports = {
@@ -114,5 +169,7 @@ module.exports = {
   get_tile_index_from_XY,
   all_tile_positions,
   get_grid_position_from_XY,
-  get_tile_distance
+  get_tile_distance,
+  get_tiles_near_tile,
+  get_tile_index_from_tileXY
 };

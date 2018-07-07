@@ -9,6 +9,8 @@ const { Repeater } = require("../assets/gameplay/emitter");
 
 const { Game, AUTO, Scene } = require("phaser");
 
+const debounce = require('debounce');
+
 const { 
   get_new_id, 
   get_random_number, 
@@ -22,7 +24,10 @@ const {
   get_XY_at_tile,
   get_random_tile_XY,
   get_tile_position_from_XY,
-  get_tile_distance
+  get_tile_distance,
+  get_tiles_near_tile,
+  get_grid_position_from_XY,
+  get_tile_index_from_tileXY
 } = require("../assets/gameplay/tileFunctions");
 
 const client = connect_socket_to_server();
@@ -68,11 +73,7 @@ scene.preload = function () {
   this.load.image('shade', '../assets/images/shade.png');
   this.load.image('tile', '../assets/images/hexagon.png');
   this.load.image('marker', '../assets/images/marker.png');
-
-  setInterval(() => {
-    // console.log(get_random_number(0, 6));
-    // console.log(get_random_of_multiple(0, 100, 7));
-  }, 500);
+  this.load.image('tile--highlighted', '../assets/images/hexagon--highlighted.png');
 
 };
 
@@ -84,7 +85,7 @@ scene.create = function () {
   game.hex_tiles = spawn_tiles();
   let move_index;
 
-  game.marker = this.add.sprite(0, 0, 'marker');
+  game.marker = this.add.sprite(0, 0, 'marker').setName('marker');
   game.marker.setOrigin = (0, 0.5);
   game.marker.visible = false;
   game.hex_tiles.add(game.marker);
@@ -196,8 +197,38 @@ const place_marker = ( x, y ) => {
   }
 }
 
-const pickle = add_listen({});
+// Have to fix the get_tiles_near_tile function 
+// because it only works at range === 1
 
-pickle.listen( "mouse_moved", repeater )( payload => {
-  // console.log("Heard!", payload);
-});
+const highlight_tiles = (xy_obj, range) => {
+  const {
+    hex_tiles
+  } = game;
+  const [tileX, tileY] = get_grid_position_from_XY(xy_obj.x, xy_obj.y);
+  const nearbyTiles =
+    get_tiles_near_tile(tileX, tileY, range)
+    .map(tile => get_XY_at_tile(tile[0], tile[1]));
+
+  const tileSprites = [...hex_tiles.children.entries]
+    .filter(sprite => sprite.name !== 'marker');
+
+  const nearbySprites = tileSprites.filter(sprite => {
+    return nearbyTiles.some(tile => {
+      return tile[0] == sprite.x &&
+        tile[1] == sprite.y;
+    });
+  });
+
+  nearbySprites.forEach(tile => {
+    tile.setTexture('tile--highlighted');
+  });
+
+  repeater.once("mouse_moved", () => {
+    tileSprites.forEach(sprite => sprite.setTexture('tile'));
+  });
+
+};
+
+repeater.on( "mouse_moved", debounce(payload => {
+  highlight_tiles(payload, 1)
+}, 50));

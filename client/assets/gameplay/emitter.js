@@ -20,12 +20,14 @@ class Repeater extends EventEmitter {
         return;
       } else {
         if (this.previousPosition) {
+          /*
           console.log(get_tile_distance(
             this.previousPosition[0],
             this.previousPosition[1]
           )(x, y));
+          */
         }
-        console.log(get_grid_position_from_XY(x, y));
+
         this.previousPosition = [ x, y ];
         this.emit("mouse_moved", { x, y });
       }
