@@ -157,11 +157,6 @@ const get_tile_index_from_tileXY = ( tileX, tileY ) => {
   return -1;
 };
 
-/*
-  TODO
-    Show all tiles within a distance of a given tile.
-*/
-
 module.exports = {
   get_XY_at_tile,
   get_random_tile_XY,

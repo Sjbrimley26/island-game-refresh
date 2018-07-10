@@ -1,5 +1,7 @@
 import "babel-polyfill";
 
+import "../assets/styles/ui.scss";
+
 const R = require("rambda");
 const {
   connect_socket_to_server
@@ -17,7 +19,9 @@ const {
   get_random_of_multiple,
   is_even,
   add_listen,
-  get_random_of_array
+  get_random_of_array,
+  shuffle_array,
+  pushUnique
  } = require("../assets/network/utilities");
 
 const {
@@ -47,13 +51,12 @@ const createSampleUser = () => {
     name: "Spencer",
     id: get_new_id(),
     x,
-    y
+    y,
+    initiative: 0
   };
 };
 
 const sampleUser = createSampleUser();
-
-const my_player = R.find(sprite => sprite.name === sampleUser.id);
 
 const repeater = new Repeater;
 
@@ -83,13 +86,15 @@ scene.create = function () {
   client.connectUser(sampleUser);
 
   game.hex_tiles = spawn_tiles();
-  let move_index;
 
   game.marker = this.add.sprite(0, 0, 'marker').setName('marker');
   game.marker.setOrigin = (0, 0.5);
   game.marker.visible = false;
   game.hex_tiles.add(game.marker);
-  move_index = game.input.addMoveCallback(checkHex);
+
+  client.game_objects.tiles = game.hex_tiles;
+
+  const move_index = game.input.addMoveCallback(checkHex);
 
   client.socket.on("UPDATE_USERS", payload => {
     console.log(payload);
@@ -107,6 +112,32 @@ scene.create = function () {
         client.player_sprites.push(shade);
       }
     });
+
+    client.game_objects.players = client.player_sprites;
+
+  });
+
+  client.socket.on("NEXT_TURN", player => {
+    if (player.id === sampleUser.id) {
+      console.log("It's your turn!");
+
+      const xy_coords = {
+        x: player.x,
+        y: player.y
+      };
+
+      highlight_tiles(xy_coords, 1);
+
+      const endTurnButton = document.getElementById("endTurnButton");
+
+      const handleEndTurn = event => {
+        endTurnButton.removeEventListener("click", handleEndTurn);
+        client.socket.emit("END_TURN");
+        reset_tiles();
+      };
+
+      endTurnButton.addEventListener("click", handleEndTurn);
+    }
 
   });
 
@@ -223,12 +254,22 @@ const highlight_tiles = (xy_obj, range) => {
     tile.setTexture('tile--highlighted');
   });
 
-  repeater.once("mouse_moved", () => {
-    tileSprites.forEach(sprite => sprite.setTexture('tile'));
-  });
+  /*
+    repeater.once("mouse_moved", () => {
+      tileSprites.forEach(sprite => sprite.setTexture('tile'));
+    });
+  */
 
 };
 
+const reset_tiles = () => {
+  const { hex_tiles } = game;
+  const tileSprites = [...hex_tiles.children.entries]
+    .filter(sprite => sprite.name !== 'marker');
+
+  tileSprites.forEach(sprite => sprite.setTexture('tile'));
+}
+
 repeater.on( "mouse_moved", debounce(payload => {
-  highlight_tiles(payload, 1)
+  // highlight_tiles(payload, 1)
 }, 50));

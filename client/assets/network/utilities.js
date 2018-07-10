@@ -69,6 +69,29 @@ const add_listen = obj => {
   }
 };
 
+const pushUnique = ( arr, item ) => {
+  if ( arr.some(thing => thing == item) ) {
+    return;
+  }
+  arr.push(item);
+};
+
+/**
+ * Shuffles array in place.
+ * @param {Array} a items An array containing the items.
+ */
+const shuffle_array = a => {
+  let j, x, i;
+  let b = [...a];
+  for (i = b.length - 1; i > 0; i--) {
+    j = Math.floor(Math.random() * (i + 1));
+    x = b[i];
+    b[i] = b[j];
+    b[j] = x;
+  }
+  return b;
+};
+
 module.exports = {
   get_new_id,
   get_random_letter,
@@ -76,5 +99,7 @@ module.exports = {
   get_random_of_multiple,
   is_even,
   get_random_of_array,
-  add_listen
+  add_listen,
+  pushUnique,
+  shuffle_array
 };

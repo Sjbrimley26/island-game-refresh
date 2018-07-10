@@ -19,7 +19,12 @@ const connect_socket_to_server = () => {
       .forEach(sprite => sprite.destroy());
 
     client.player_sprites = currentPlayers;
+    client.game_objects.players = currentPlayers;
 
+  });
+
+  socket.on("NEXT_TURN", player => {
+    console.log(`${player.id}'s turn!`);
   });
 
   const client = {
@@ -33,7 +38,8 @@ const connect_socket_to_server = () => {
         .forEach(player => cb(this.players[player]))
     },
     listener: {},
-    player_sprites: []
+    player_sprites: [],
+    game_objects: {}
   };
 
   return client;
