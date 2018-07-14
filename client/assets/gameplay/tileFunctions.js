@@ -21,13 +21,12 @@ const get_XY_at_tile = (tileX, tileY) => {
 
 // The center positions at least
 const all_tile_positions = [];
-for (let i = 0; i < 12; i++) {
-  for (let j = 0; j < 16; j++) {
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j < columns; j++) {
     all_tile_positions.push(get_XY_at_tile(i, j));
   }
 };
 
-// Each area contains all the points in the tile
 const all_tile_areas = all_tile_positions.map(tile => {
   let [ x, y ] = tile;
   const startX = x - hexagon_width / 4;
@@ -35,16 +34,57 @@ const all_tile_areas = all_tile_positions.map(tile => {
   const startY = y - hexagon_height / 2;
   const endY = y + hexagon_height / 2;
 
+  const beginX = startX - hexagon_width / 4;
+  const finishX = endX + hexagon_width / 4;
+  const centerY = ((endY - startY) / 2) + startY;
+
   const x_values = range(startX, endX);
   const y_values = range(startY, endY);
   
   const xy_values = [];
   
+  // Center Rectangle
   x_values.forEach(x_value => {
     return y_values.forEach(y_value => {
       xy_values.push([x_value, y_value]);
     });
   });
+
+  // Top right triangle
+  for ( let i = endX; i <= (endX + hexagon_width/4); i++ ) {
+    for (let j = centerY; j >= startY ; j--) {
+      if ( j > startY + 7/4 * (i - endX)) {
+        xy_values.push([i, j]);
+      }
+    }
+  }
+
+  // Bottom right triangle
+  for (let i = endX; i <= finishX; i++) {
+    for (let j = endY; j >= ((endY - startY) / 2) + startY; j--) {
+      if (j < centerY + 7 / 4 * (i - endX)) {
+        xy_values.push([i, j]);
+      }
+    }
+  }
+
+  // Top left
+  for ( let i = beginX; i <= startX; i++) {
+    for (let j = centerY; j >= startY; j--) {
+      if ( j - centerY > 7/4 * (i - beginX) ) {
+        xy_values.push([i, j]);
+      }
+    }
+  }
+
+  // Bottom left
+  for (let i = beginX; i <= startX; i++) {
+    for (let j = endY; j >= centerY; j--) {
+      if (j - centerY < 7 / 4 * (i - beginX)) {
+        xy_values.push([i, j]);
+      }
+    }
+  }
 
   return xy_values;
 });
@@ -103,11 +143,10 @@ const get_tile_distance = (x1, y1) => (x2, y2) => {
   return xDiff >= yDiff ? xDiff : yDiff; 
 };
 
-// Only works when tiles are one tile away for now
-
 const get_tiles_near_tile = ( tileX, tileY, maxDistance ) => {
   let tiles = [];
-  let factors = range(1, maxDistance + 1);
+  let it = maxDistance
+  
   
   const push_if_new = ( array, xy_pair ) => {
     if ( 
@@ -123,21 +162,31 @@ const get_tiles_near_tile = ( tileX, tileY, maxDistance ) => {
 
   const add_tile = curry(push_if_new)(tiles);
 
-  factors.forEach(factor => {
-    add_tile([tileX + factor, tileY]);
-    add_tile([tileX - factor, tileY]);
-    add_tile([tileX, tileY + factor]);
-    add_tile([tileX, tileY - factor]);
+  // Recursive function for the win!!!
 
-    if ( is_even(tileX) ) {
-      add_tile([tileX - factor, tileY - factor]);
-      add_tile([tileX + factor, tileY - factor]);
+  const add_tiles_around_tileXY = ( tileX, tileY ) => {
+    add_tile([tileX + 1, tileY]);
+    add_tile([tileX - 1, tileY]);
+    add_tile([tileX, tileY + 1]);
+    add_tile([tileX, tileY - 1]);
+
+    if (is_even(tileX)) {
+      add_tile([tileX - 1, tileY - 1]);
+      add_tile([tileX + 1, tileY - 1]);
     } else {
-      add_tile([tileX - factor, tileY + factor]);
-      add_tile([tileX + factor, tileY + factor]);
+      add_tile([tileX - 1, tileY + 1]);
+      add_tile([tileX + 1, tileY + 1]);
     }
-  });
+  };
 
+  add_tiles_around_tileXY(tileX, tileY);
+
+  while (it > 1) {
+    it --;
+    tiles.forEach(tile => {
+      add_tiles_around_tileXY(tile[0], tile[1]);
+    });
+  }
 
   return tiles.filter(tile => {
     return tile[0] >= 0 &&

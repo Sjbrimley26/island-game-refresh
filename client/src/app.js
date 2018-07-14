@@ -3,13 +3,14 @@ import "babel-polyfill";
 import "../assets/styles/ui.scss";
 
 const R = require("rambda");
+
 const {
   connect_socket_to_server
 } = require("../assets/network/socket");
 
 const { Repeater } = require("../assets/gameplay/emitter");
 
-const { Game, AUTO, Scene } = require("phaser");
+const { Game, CANVAS, Scene } = require("phaser");
 
 const debounce = require('debounce');
 
@@ -63,7 +64,7 @@ const repeater = new Repeater;
 const scene = new Scene('Game');
 
 const phaserConfig = {
-  type: AUTO,
+  type: CANVAS,
   width: 1080,
   height: 810,
   scene
@@ -126,22 +127,27 @@ scene.create = function () {
         y: player.y
       };
 
-      highlight_tiles(xy_coords, 1);
+      highlight_tiles(xy_coords, 2);
 
       const emit_player_movement = sprite => {
-        const { x, y } = game.marker;
-        const payload = {
-          player,
-          x,
-          y
-        };
+        try {
+          const [x, y] = get_tile_position_from_XY(sprite.x, sprite.y);
+          const payload = {
+            player,
+            x,
+            y
+          };
 
-        client.socket.emit("PLAYER_MOVE", payload);
-        reset_tiles();
-        moveable_tiles.forEach(tile => tile.off("pointerdown", emit_player_movement));
+          client.socket.emit("PLAYER_MOVE", payload);
+          reset_tiles();
+          moveable_tiles.forEach(tile => tile.off("pointerdown", emit_player_movement));
+        }
+        catch (e) {
+          // I know in my heart that this is wrong, haha.
+        }
       };
 
-      const moveable_tiles = get_nearby_tile_sprites(xy_coords, 1);
+      const moveable_tiles = get_nearby_tile_sprites(xy_coords, 2);
       moveable_tiles.forEach(sprite => {
         sprite.on("pointerdown", emit_player_movement);
       })
@@ -246,9 +252,6 @@ const place_marker = ( x, y ) => {
   }
 }
 
-// Have to fix the get_tiles_near_tile function 
-// because it only works at range === 1
-
 const get_nearby_tile_sprites = ( xy_obj, range ) => {
   const {
     hex_tiles
@@ -271,7 +274,7 @@ const get_nearby_tile_sprites = ( xy_obj, range ) => {
   return nearbySprites;
 };
 
-const highlight_tiles = (xy_obj, range) => {
+const highlight_tiles = ( xy_obj, range ) => {
   const nearbySprites = get_nearby_tile_sprites(xy_obj, range);
 
   nearbySprites.forEach(tile => {
@@ -280,10 +283,16 @@ const highlight_tiles = (xy_obj, range) => {
 
 };
 
-const reset_tiles = () => {
-  const { hex_tiles } = game;
-  const tileSprites = [...hex_tiles.children.entries]
+const get_all_tile_sprites = () => {
+  const {
+    hex_tiles
+  } = game;
+  return [...hex_tiles.children.entries]
     .filter(sprite => sprite.name !== 'marker');
+};
+
+const reset_tiles = () => {
+  const tileSprites = get_all_tile_sprites();
 
   tileSprites.forEach(sprite => {
     sprite.setTexture('tile');
@@ -291,5 +300,5 @@ const reset_tiles = () => {
 };
 
 repeater.on( "mouse_moved", debounce(payload => {
-  // highlight_tiles(payload, 1)
+  // highlight_tiles(payload, 3);
 }, 50));

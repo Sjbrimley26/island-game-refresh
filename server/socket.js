@@ -26,6 +26,10 @@ const addSocketFunctions = io => {
       });
     } while (random_already_used)
 
+    if (Object.values(io.players).length === 1) {
+      random = 100;
+    }
+
     return random;
   };
 
