@@ -128,6 +128,24 @@ scene.create = function () {
 
       highlight_tiles(xy_coords, 1);
 
+      const emit_player_movement = sprite => {
+        const { x, y } = game.marker;
+        const payload = {
+          player,
+          x,
+          y
+        };
+
+        client.socket.emit("PLAYER_MOVE", payload);
+        reset_tiles();
+        moveable_tiles.forEach(tile => tile.off("pointerdown", emit_player_movement));
+      };
+
+      const moveable_tiles = get_nearby_tile_sprites(xy_coords, 1);
+      moveable_tiles.forEach(sprite => {
+        sprite.on("pointerdown", emit_player_movement);
+      })
+
       const endTurnButton = document.getElementById("endTurnButton");
 
       const handleEndTurn = event => {
@@ -162,7 +180,7 @@ const spawn_tiles = () => {
 
         let hex_y = hexagon_height * j/2;
 
-        let hexagon = scene.add.sprite(hex_x, hex_y, "tile");
+        let hexagon = scene.add.sprite(hex_x, hex_y, "tile").setInteractive();
         hexagon_group.add(hexagon);
       }
     }
@@ -231,7 +249,7 @@ const place_marker = ( x, y ) => {
 // Have to fix the get_tiles_near_tile function 
 // because it only works at range === 1
 
-const highlight_tiles = (xy_obj, range) => {
+const get_nearby_tile_sprites = ( xy_obj, range ) => {
   const {
     hex_tiles
   } = game;
@@ -250,15 +268,15 @@ const highlight_tiles = (xy_obj, range) => {
     });
   });
 
+  return nearbySprites;
+};
+
+const highlight_tiles = (xy_obj, range) => {
+  const nearbySprites = get_nearby_tile_sprites(xy_obj, range);
+
   nearbySprites.forEach(tile => {
     tile.setTexture('tile--highlighted');
   });
-
-  /*
-    repeater.once("mouse_moved", () => {
-      tileSprites.forEach(sprite => sprite.setTexture('tile'));
-    });
-  */
 
 };
 
@@ -267,8 +285,10 @@ const reset_tiles = () => {
   const tileSprites = [...hex_tiles.children.entries]
     .filter(sprite => sprite.name !== 'marker');
 
-  tileSprites.forEach(sprite => sprite.setTexture('tile'));
-}
+  tileSprites.forEach(sprite => {
+    sprite.setTexture('tile');
+  });
+};
 
 repeater.on( "mouse_moved", debounce(payload => {
   // highlight_tiles(payload, 1)

@@ -5,18 +5,15 @@ const addSocketFunctions = io => {
   io.players = {};
   io.victory = false;
 
+  const minimumPlayers = 2;
+
   let turn = 0;
   let trueTurn = 0;
-  const minimumPlayers = 2;
   let playerCount = 0;
   let turnOrder = [];
 
   const check_if_enough_players = () => {
     return playerCount >= minimumPlayers; 
-  };
-
-  const find_player_by_id = id => {
-    return R.find(player => player.id === id);
   };
 
   const get_initiative = () => {
@@ -117,7 +114,7 @@ const addSocketFunctions = io => {
 
     socket.on("PLAYER_MOVE", payload => {
       const { player, x, y } = payload;
-      const affectedPlayer = find_player_by_id(player.id)(io.players);
+      const affectedPlayer = io.players[player.id];
       affectedPlayer.x = x;
       affectedPlayer.y = y;
       update_user_broadcast();
