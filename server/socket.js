@@ -39,6 +39,7 @@ const addSocketFunctions = io => {
 
   const update_user_broadcast = broadcast.bind(this, "UPDATE_USERS", io.players);
   const disconnect_broadcast = broadcast.bind(this, "disconnect", io.players);
+  const turn_zero_broadcast = R.curry(broadcast)("TURN_ZERO");
   const next_turn_broadcast = R.curry(broadcast)("NEXT_TURN");
 
   io.on("connection", socket => {
@@ -54,7 +55,7 @@ const addSocketFunctions = io => {
       turnOrder = turnOrder.concat(user).sort((a,b) => {
         return b.initiative - a.initiative;
       });
-
+      
       if ( check_if_enough_players() && trueTurn == 0 ) {
         next_turn_broadcast(turnOrder[turn]);
       }
@@ -80,30 +81,27 @@ const addSocketFunctions = io => {
         update_user_broadcast();
         disconnect_broadcast();
         playerCount--;
-
-        /*
-          If someone disconnects on their turn, it goes to the next person, but
-          it causes the player to go twice if they are the only one remaining and then
-          someone else joins with a higher initiative.
-          One temporary fix would be to make every player join with a lower initiative and 
-          then shuffle it after the game officially begins. 
-          (That's what I'm gonna do for now)
-        */
-        if (deletedIndex === turn && Object.values(io.players).length != 1) {
-          if (turn + 1 <= Object.values(io.players).length - 1) {
+        
+        if ( deletedIndex == turn && Object.entries(io.players).length > 1 ) {
+          if ( turn + 1 <= turnOrder.length - 1) {
             turn++;
           } else {
             turn = 0;
           }
-          trueTurn++;
           next_turn_broadcast(turnOrder[turn]);
         }
-        else if (Object.values(io.players).length === 1) {
-          turn = 0;
-          trueTurn = 0;
+        else if ( Object.entries(io.players).length <= 1 ) {
+          turn_zero_broadcast({});
         }
+        
+      
       }
 
+    });
+
+    socket.on("TURN_ZERO", () => {
+      turn = 0;
+      trueTurn = 0;
     });
 
     socket.on("END_TURN", () => {

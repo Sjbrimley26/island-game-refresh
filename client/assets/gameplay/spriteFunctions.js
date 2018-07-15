@@ -105,6 +105,7 @@ const reset_tiles = game => {
 
   tileSprites.forEach(sprite => {
     sprite.setTexture('tile');
+    sprite.removeAllListeners("pointerdown");
   });
 };
 

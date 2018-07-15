@@ -153,7 +153,11 @@ const get_tiles_near_tile = ( tileX, tileY, maxDistance ) => {
       array.some(coord => {
         xy_pair[0] == coord[0] &&
         xy_pair[1] == coord[1]
-      }) 
+      }) ||
+      ( // also exclude the origin
+        xy_pair[0] == tileX &&
+        xy_pair[1] == tileY
+      )
     ) {
       return;
     }

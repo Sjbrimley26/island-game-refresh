@@ -153,13 +153,26 @@ scene.create = function () {
 
       const handleEndTurn = event => {
         endTurnButton.removeEventListener("click", handleEndTurn);
+        endTurnButton.classList.toggle("active");
         client.socket.emit("END_TURN");
         reset_tiles(game);
       };
 
       endTurnButton.addEventListener("click", handleEndTurn);
+      endTurnButton.classList.toggle("active");
     }
 
+  });
+
+  client.socket.on("TURN_ZERO", () => {
+    client.socket.emit("TURN_ZERO");
+
+    const endTurnButton = document.getElementById("endTurnButton");
+    endTurnButton.classList.remove("active");
+    const cloneButton = endTurnButton.cloneNode(true);
+    endTurnButton.parentNode.replaceChild(cloneButton, endTurnButton);
+    reset_tiles(game);
+    
   });
 
 };
