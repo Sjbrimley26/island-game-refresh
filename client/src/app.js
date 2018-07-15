@@ -1,6 +1,7 @@
 import "babel-polyfill";
 
 import "../assets/styles/ui.scss";
+import { get } from "http";
 
 const R = require("rambda");
 
@@ -10,29 +11,27 @@ const {
 
 const { Repeater } = require("../assets/gameplay/emitter");
 
+const { 
+  spawn_tiles,
+  reset_tiles,
+  highlight_tiles,
+  highlight_tiles_near_XY,
+  get_all_tile_sprites,
+  get_nearby_tile_sprites,
+  move_player_to_sprite
+ } = require("../assets/gameplay/spriteFunctions");
+
 const { Game, CANVAS, Scene } = require("phaser");
 
 const debounce = require('debounce');
 
 const { 
   get_new_id, 
-  get_random_number, 
-  get_random_of_multiple,
-  is_even,
-  add_listen,
-  get_random_of_array,
-  shuffle_array,
-  pushUnique
  } = require("../assets/network/utilities");
 
 const {
-  get_XY_at_tile,
   get_random_tile_XY,
   get_tile_position_from_XY,
-  get_tile_distance,
-  get_tiles_near_tile,
-  get_grid_position_from_XY,
-  get_tile_index_from_tileXY
 } = require("../assets/gameplay/tileFunctions");
 
 const client = connect_socket_to_server();
@@ -86,7 +85,7 @@ scene.create = function () {
 
   client.connectUser(sampleUser);
 
-  game.hex_tiles = spawn_tiles();
+  game.hex_tiles = spawn_tiles(scene);
 
   game.marker = this.add.sprite(0, 0, 'marker').setName('marker');
   game.marker.setOrigin = (0, 0.5);
@@ -127,9 +126,7 @@ scene.create = function () {
         y: player.y
       };
 
-      highlight_tiles(xy_coords, 2);
-
-      const emit_player_movement = sprite => {
+      const move_player_to_sprite = sprite => {
         try {
           const [x, y] = get_tile_position_from_XY(sprite.x, sprite.y);
           const payload = {
@@ -139,25 +136,25 @@ scene.create = function () {
           };
 
           client.socket.emit("PLAYER_MOVE", payload);
-          reset_tiles();
-          moveable_tiles.forEach(tile => tile.off("pointerdown", emit_player_movement));
-        }
-        catch (e) {
+          reset_tiles(game);
+          moveable_tiles.forEach(tile => tile.off("pointerdown", move_player_to_sprite));
+        } catch (e) {
           // I know in my heart that this is wrong, haha.
         }
       };
 
-      const moveable_tiles = get_nearby_tile_sprites(xy_coords, 2);
+      const moveable_tiles = get_nearby_tile_sprites(game)(xy_coords, 2);
       moveable_tiles.forEach(sprite => {
-        sprite.on("pointerdown", emit_player_movement);
-      })
+        sprite.on("pointerdown", move_player_to_sprite);
+      });
+      highlight_tiles(moveable_tiles);
 
       const endTurnButton = document.getElementById("endTurnButton");
 
       const handleEndTurn = event => {
         endTurnButton.removeEventListener("click", handleEndTurn);
         client.socket.emit("END_TURN");
-        reset_tiles();
+        reset_tiles(game);
       };
 
       endTurnButton.addEventListener("click", handleEndTurn);
@@ -165,56 +162,6 @@ scene.create = function () {
 
   });
 
-};
-
-const spawn_tiles = () => {
-  const hexagon_width = 128;
-  const hexagon_height = 112;
-  const grid_x = 12;
-  const grid_y = 16;
-  let hexagon_group;
-
-  hexagon_group = scene.add.group();
-
-  for (let i = 0; i < grid_x / 2; i++) {
-    for (let j = 0; j < grid_y; j++) {
-      if ( is_even(grid_x) || i+1 < grid_x/2 ||  is_even(j) ) {
-        let hex_x = 
-          (hexagon_width * i * 1.5) + 
-          (hexagon_width / 4 * 3) * 
-          (j % 2);
-
-        let hex_y = hexagon_height * j/2;
-
-        let hexagon = scene.add.sprite(hex_x, hex_y, "tile").setInteractive();
-        hexagon_group.add(hexagon);
-      }
-    }
-  }
-
-  hexagon_group.y = (
-    600 - 
-    hexagon_height * 
-    Math.ceil(grid_y/2)
-  ) / 2;
-
-  if ( is_even(grid_y) ) {
-    hexagon_group.y -= hexagon_height/4;
-  }
-
-  hexagon_group.x = (
-    800 - 
-    Math.ceil(grid_x/2) * 
-    hexagon_width -
-    Math.floor(grid_x/2) *
-    hexagon_width/2
-  ) / 2;
-
-  if ( is_even(grid_x) ) {
-    hexagon_group.x -= hexagon_width/8;
-  }
-
-  return hexagon_group;
 };
 
 const checkHex = event => {
@@ -252,53 +199,6 @@ const place_marker = ( x, y ) => {
   }
 }
 
-const get_nearby_tile_sprites = ( xy_obj, range ) => {
-  const {
-    hex_tiles
-  } = game;
-  const [tileX, tileY] = get_grid_position_from_XY(xy_obj.x, xy_obj.y);
-  const nearbyTiles =
-    get_tiles_near_tile(tileX, tileY, range)
-    .map(tile => get_XY_at_tile(tile[0], tile[1]));
-
-  const tileSprites = [...hex_tiles.children.entries]
-    .filter(sprite => sprite.name !== 'marker');
-
-  const nearbySprites = tileSprites.filter(sprite => {
-    return nearbyTiles.some(tile => {
-      return tile[0] == sprite.x &&
-        tile[1] == sprite.y;
-    });
-  });
-
-  return nearbySprites;
-};
-
-const highlight_tiles = ( xy_obj, range ) => {
-  const nearbySprites = get_nearby_tile_sprites(xy_obj, range);
-
-  nearbySprites.forEach(tile => {
-    tile.setTexture('tile--highlighted');
-  });
-
-};
-
-const get_all_tile_sprites = () => {
-  const {
-    hex_tiles
-  } = game;
-  return [...hex_tiles.children.entries]
-    .filter(sprite => sprite.name !== 'marker');
-};
-
-const reset_tiles = () => {
-  const tileSprites = get_all_tile_sprites();
-
-  tileSprites.forEach(sprite => {
-    sprite.setTexture('tile');
-  });
-};
-
 repeater.on( "mouse_moved", debounce(payload => {
-  // highlight_tiles(payload, 3);
-}, 50));
+  // highlight_tiles_near_XY(game)(payload, 2);
+}, 200));
