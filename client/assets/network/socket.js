@@ -6,13 +6,13 @@ const connect_socket_to_server = () => {
   const socket = io.connect(host);
 
   socket.on("UPDATE_USERS", players => {
+    players = new Map(players);
     client.players = players;
   });
 
   socket.on("disconnect", () => {
     const currentPlayers = client.player_sprites.filter(sprite => {
-      return Object.keys(client.players)
-        .some(player => player === sprite.name);
+      return client.players.has(sprite.name);
     });
 
     client.player_sprites.filter(sprite => !currentPlayers.includes(sprite))
@@ -24,18 +24,18 @@ const connect_socket_to_server = () => {
   });
 
   socket.on("NEXT_TURN", player => {
-    console.log(`${player.id}'s turn!`);
+    // console.log(`${player.id}'s turn!`);
   });
 
   const client = {
     socket,
     connectUser: function (user) {
+      console.log(user);
       this.socket.emit('ADD_USER', user);
     },
-    players: {},
+    players: new Map(),
     every_player: function ( cb ) {
-      Object.keys(this.players)
-        .forEach(player => cb(this.players[player]))
+      this.players.forEach(player => cb(player))
     },
     listener: {},
     player_sprites: [],

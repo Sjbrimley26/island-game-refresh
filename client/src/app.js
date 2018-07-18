@@ -1,7 +1,6 @@
 import "babel-polyfill";
 
 import "../assets/styles/ui.scss";
-import { get } from "http";
 
 const R = require("rambda");
 
@@ -17,46 +16,22 @@ const {
   highlight_tiles,
   highlight_tiles_near_XY,
   get_all_tile_sprites,
-  get_nearby_tile_sprites,
-  move_player_to_sprite
+  get_nearby_tile_sprites
  } = require("../assets/gameplay/spriteFunctions");
 
 const { Game, CANVAS, Scene } = require("phaser");
 
 const debounce = require('debounce');
 
-const { 
-  get_new_id, 
- } = require("../assets/network/utilities");
+const { createSampleUser, add_client_functions } = require("../assets/objects/Player");
 
 const {
-  get_random_tile_XY,
   get_tile_position_from_XY,
 } = require("../assets/gameplay/tileFunctions");
 
 const client = connect_socket_to_server();
 
-const createSampleUser = () => {
-  let [ x, y ] = [0, 0];
-  while (
-    x == 0 ||
-    y == 0 ||
-    x > 1080 ||
-    y > 810
-  ) {
-    [x, y] = get_random_tile_XY();
-  }
-
-  return {
-    name: "Spencer",
-    id: get_new_id(),
-    x,
-    y,
-    initiative: 0
-  };
-};
-
-const sampleUser = createSampleUser();
+const sampleUser = createSampleUser("Spencer");
 
 const repeater = new Repeater;
 
@@ -97,7 +72,6 @@ scene.create = function () {
   const move_index = game.input.addMoveCallback(checkHex);
 
   client.socket.on("UPDATE_USERS", payload => {
-    console.log(payload);
     // console.log(`${player.name} received test_event with payload:`, payload);
     client.every_player(player => {
       // console.log(player);
@@ -119,12 +93,15 @@ scene.create = function () {
 
   client.socket.on("NEXT_TURN", player => {
     if (player.id === sampleUser.id) {
-      console.log("It's your turn!");
 
       const xy_coords = {
         x: player.x,
         y: player.y
       };
+
+      const currentPlayer = add_client_functions(client.players.get(player.id))(client);
+      currentPlayer.add_status_effect("stunned");
+      currentPlayer.onStartTurn();
 
       const move_player_to_sprite = sprite => {
         try {
@@ -141,7 +118,7 @@ scene.create = function () {
         } catch (e) {
           // I know in my heart that this is wrong, haha.
         }
-      };
+      }
 
       const moveable_tiles = get_nearby_tile_sprites(game)(xy_coords, 2);
       moveable_tiles.forEach(sprite => {
@@ -155,6 +132,7 @@ scene.create = function () {
         endTurnButton.removeEventListener("click", handleEndTurn);
         endTurnButton.classList.toggle("active");
         client.socket.emit("END_TURN");
+        currentPlayer.onEndTurn();
         reset_tiles(game);
       };
 

@@ -1,4 +1,4 @@
-const { is_even } = require("../network/utilities");
+const { is_even } = require("./logic");
 const { 
   get_grid_position_from_XY,
   get_tiles_near_tile,

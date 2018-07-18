@@ -1,30 +1,29 @@
 const R = require("rambda");
-const { get_random_number } = require("../client/assets/network/utilities");
+const { get_random_number } = require("../client/assets/gameplay/logic");
 
 const addSocketFunctions = io => {
-  io.players = {};
+  io.players = new Map();
   io.victory = false;
 
   const minimumPlayers = 2;
 
   let turn = 0;
   let trueTurn = 0;
-  let playerCount = 0;
   let turnOrder = [];
 
   const check_if_enough_players = () => {
-    return playerCount >= minimumPlayers; 
+    return io.players.size == minimumPlayers; 
   };
 
   const get_initiative = () => {
-    let random_already_used;
+    let random_too_high;
     let random;
     do {
       random = get_random_number(0, 100);
-      random_already_used = Object.values(io.players).some(player => {
+      random_too_high = Object.values(io.players).every(player => {
         return player.initiative <= random;
       });
-    } while (random_already_used)
+    } while (random_too_high)
 
     if (Object.values(io.players).length === 1) {
       random = 100;
@@ -33,25 +32,29 @@ const addSocketFunctions = io => {
     return random;
   };
 
-  const broadcast = (action, payload) => {
+  const broadcast = action => payload => {
+    if (payload instanceof Map) {
+      payload = Array.from(payload);
+    }
     return io.sockets.emit(action, payload);
   };
 
-  const update_user_broadcast = broadcast.bind(this, "UPDATE_USERS", io.players);
-  const disconnect_broadcast = broadcast.bind(this, "disconnect", io.players);
-  const turn_zero_broadcast = R.curry(broadcast)("TURN_ZERO");
-  const next_turn_broadcast = R.curry(broadcast)("NEXT_TURN");
+  const update_user_broadcast = broadcast("UPDATE_USERS");
+  const disconnect_broadcast = broadcast("disconnect");
+  const turn_zero_broadcast = broadcast("TURN_ZERO");
+  const next_turn_broadcast = broadcast("NEXT_TURN");
 
   io.on("connection", socket => {
 
     socket.on("ADD_USER", user => {
       // console.log(`User #${user.id} connected!`);
+      const { id } = user;
       user.initiative = get_initiative();
-      io.players[user.id] = user;
+      io.players.set(id, user);
       socket.user = user;
-      update_user_broadcast();
+
+      update_user_broadcast(io.players);
       
-      playerCount++;
       turnOrder = turnOrder.concat(user).sort((a,b) => {
         return b.initiative - a.initiative;
       });
@@ -65,7 +68,7 @@ const addSocketFunctions = io => {
     socket.on("disconnect", () => {
       if (socket.user) {
         // console.log(`User #${socket.user.id} disconnected!`);
-        delete io.players[socket.user.id];
+        io.players.delete(socket.user.id);
         let deletedIndex = R.findIndex(user => user.id == socket.user.id)(turnOrder);
 
         turnOrder = turnOrder.slice(
@@ -78,11 +81,10 @@ const addSocketFunctions = io => {
           )
         );
 
-        update_user_broadcast();
-        disconnect_broadcast();
-        playerCount--;
+        update_user_broadcast(io.players);
+        disconnect_broadcast(io.players);
         
-        if ( deletedIndex == turn && Object.entries(io.players).length > 1 ) {
+        if ( deletedIndex == turn && io.players.size > 1 ) {
           if ( turn + 1 <= turnOrder.length - 1) {
             turn++;
           } else {
@@ -90,11 +92,10 @@ const addSocketFunctions = io => {
           }
           next_turn_broadcast(turnOrder[turn]);
         }
-        else if ( Object.entries(io.players).length <= 1 ) {
+        else if ( io.players.size <= 1 ) {
           turn_zero_broadcast({});
         }
-        
-      
+           
       }
 
     });
@@ -107,7 +108,7 @@ const addSocketFunctions = io => {
     socket.on("END_TURN", () => {
       turn++;
       trueTurn++;
-      if (turn >= playerCount) {
+      if (turn >= io.players.size) {
         turn = 0;
       }
       next_turn_broadcast(turnOrder[turn]);
@@ -116,10 +117,17 @@ const addSocketFunctions = io => {
 
     socket.on("PLAYER_MOVE", payload => {
       const { player, x, y } = payload;
-      const affectedPlayer = io.players[player.id];
+      const affectedPlayer = io.players.get(player.id);
       affectedPlayer.x = x;
       affectedPlayer.y = y;
-      update_user_broadcast();
+      update_user_broadcast(io.players);
+    });
+
+    socket.on("UPDATE_ITEMS", player => {
+      const { id, inventory } = player;
+      const affectedPlayer = io.players.get(id);
+      affectedPlayer.inventory = inventory;
+      update_user_broadcast(io.players);
     });
     
 
