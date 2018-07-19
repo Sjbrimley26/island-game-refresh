@@ -1,4 +1,4 @@
-const { get_random_of_array, is_even } = require("./logic");
+const { get_random_of_array, is_even } = require("./utilities");
 const { range, compose, zip, flatten, curry, subtract, add } = require("rambda");
 
 const hexagon_width = 128;

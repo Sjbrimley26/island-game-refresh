@@ -1,5 +1,5 @@
 const R = require("rambda");
-const { get_random_number } = require("../client/assets/gameplay/logic");
+const { get_random_number } = require("../client/assets/gameplay/utilities");
 
 const addSocketFunctions = io => {
   io.players = new Map();
@@ -16,12 +16,13 @@ const addSocketFunctions = io => {
   };
 
   const get_initiative = () => {
+    // This is still a bit buggy
     let random_too_high;
     let random;
     do {
       random = get_random_number(0, 100);
-      random_too_high = Object.values(io.players).every(player => {
-        return player.initiative <= random;
+      random_too_high = Object.values(io.players).some(player => {
+        return player.initiative > random;
       });
     } while (random_too_high)
 
@@ -43,11 +44,12 @@ const addSocketFunctions = io => {
   const disconnect_broadcast = broadcast("disconnect");
   const turn_zero_broadcast = broadcast("TURN_ZERO");
   const next_turn_broadcast = broadcast("NEXT_TURN");
+  const end_draw_phase_broadcast = broadcast("END_DRAW_PHASE");
 
   io.on("connection", socket => {
 
     socket.on("ADD_USER", user => {
-      // console.log(`User #${user.id} connected!`);
+      console.log(`User ${user.id} connected!`);
       const { id } = user;
       user.initiative = get_initiative();
       io.players.set(id, user);
@@ -60,7 +62,10 @@ const addSocketFunctions = io => {
       });
       
       if ( check_if_enough_players() && trueTurn == 0 ) {
-        next_turn_broadcast(turnOrder[turn]);
+        turn_zero_broadcast({});
+        setTimeout(() => {
+          next_turn_broadcast(turnOrder[turn]);
+        }, 50);
       }
     
     });
@@ -128,6 +133,10 @@ const addSocketFunctions = io => {
       const affectedPlayer = io.players.get(id);
       affectedPlayer.inventory = inventory;
       update_user_broadcast(io.players);
+    });
+
+    socket.on("END_DRAW_PHASE", id => {
+      end_draw_phase_broadcast(id);
     });
     
 

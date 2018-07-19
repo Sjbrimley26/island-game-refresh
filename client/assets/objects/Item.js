@@ -1,18 +1,14 @@
-// Probably going to have to migrate the items' use function into the Player
-// Object or some other way.
+const { get_new_id } = require("../gameplay/logic");
 
 const createItem = (name, rarity) => {
   return {
     name,
     rarity,
-
-    use () {
-      //Normal "Use" Case
-      console.log(`${this.name} was used`);
-    },
+    id: get_new_id(),
 
     withCharges ( initialCharge = 1 ) {
       this.charges = initialCharge;
+      this.hasCharges = true;
 
       this.addCharge = () => {
         if ( this.charges + 1 <= initialCharge * 2 ) {
@@ -21,23 +17,9 @@ const createItem = (name, rarity) => {
         return this.charges;
       }
 
-      this.use = () => {
-        if  ( this.charges >= 1 ) {
-          this.charges--;
-          console.log(`${this.name} was used!`);
-        }
-      }
-
       this.isFree = () => {
         this.been_used = false;
-
-        this.use = () => {
-          if (this.charges >= 1) {
-            this.charges--;
-            this.been_used = true;
-            console.log(`${this.name} was used!!!`);
-          }
-        };
+        this.isFreeItem = true;
 
         this.onStartTurn = () => {
           this.been_used = false;

@@ -10,6 +10,10 @@ const {
 
 const { Repeater } = require("../assets/gameplay/emitter");
 
+const { add_lingering_effect } = require("../assets/gameplay/statusEffects");
+
+const { repeatFn } = require("../assets/gameplay/utilities");
+
 const { 
   spawn_tiles,
   reset_tiles,
@@ -30,6 +34,7 @@ const {
 } = require("../assets/gameplay/tileFunctions");
 
 const client = connect_socket_to_server();
+const make_player_interactive = add_client_functions(client);
 
 const sampleUser = createSampleUser("Spencer");
 
@@ -71,7 +76,7 @@ scene.create = function () {
 
   const move_index = game.input.addMoveCallback(checkHex);
 
-  client.socket.on("UPDATE_USERS", payload => {
+  client.socket.on("UPDATE_USERS", playerArr => {
     // console.log(`${player.name} received test_event with payload:`, payload);
     client.every_player(player => {
       // console.log(player);
@@ -99,12 +104,12 @@ scene.create = function () {
         y: player.y
       };
 
-      const currentPlayer = add_client_functions(client.players.get(player.id))(client);
-      currentPlayer.add_status_effect("stunned");
+      const currentPlayer = make_player_interactive(client.players.get(player.id));
       currentPlayer.onStartTurn();
 
       const move_player_to_sprite = sprite => {
         try {
+          player.has_moved = true;
           const [x, y] = get_tile_position_from_XY(sprite.x, sprite.y);
           const payload = {
             player,
@@ -114,30 +119,23 @@ scene.create = function () {
 
           client.socket.emit("PLAYER_MOVE", payload);
           reset_tiles(game);
-          moveable_tiles.forEach(tile => tile.off("pointerdown", move_player_to_sprite));
+
         } catch (e) {
           // I know in my heart that this is wrong, haha.
         }
-      }
 
-      const moveable_tiles = get_nearby_tile_sprites(game)(xy_coords, 2);
-      moveable_tiles.forEach(sprite => {
-        sprite.on("pointerdown", move_player_to_sprite);
-      });
-      highlight_tiles(moveable_tiles);
-
-      const endTurnButton = document.getElementById("endTurnButton");
-
-      const handleEndTurn = event => {
-        endTurnButton.removeEventListener("click", handleEndTurn);
-        endTurnButton.classList.toggle("active");
-        client.socket.emit("END_TURN");
-        currentPlayer.onEndTurn();
-        reset_tiles(game);
       };
 
-      endTurnButton.addEventListener("click", handleEndTurn);
-      endTurnButton.classList.toggle("active");
+      if ( currentPlayer.has_moved !== true ) {
+        const moveable_tiles = get_nearby_tile_sprites(game)(xy_coords, 2);
+        moveable_tiles.forEach(sprite => {
+          sprite.on("pointerdown", move_player_to_sprite);
+        });
+        highlight_tiles(moveable_tiles);
+      }
+
+      client.prepEndTurn( currentPlayer );
+
     }
 
   });
@@ -150,6 +148,15 @@ scene.create = function () {
     const cloneButton = endTurnButton.cloneNode(true);
     endTurnButton.parentNode.replaceChild(cloneButton, endTurnButton);
     reset_tiles(game);
+
+
+    let tempPlayer = make_player_interactive(client.players.get(sampleUser.id));
+    tempPlayer.inventory = [];
+    repeatFn(() => tempPlayer.pick_up_item("common"), 3);
+    repeatFn(() => tempPlayer.pick_up_item("uncommon"), 2);
+    tempPlayer.pick_up_item("rare")
+    add_lingering_effect(client)(tempPlayer)("stunned")(3);
+
     
   });
 
